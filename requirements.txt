@@ -3,7 +3,7 @@ flask
 requests
 numpy
 openai
-langchain>
+langchain
 faiss-cp
 pdfplumbe
 python-docx
