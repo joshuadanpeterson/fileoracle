@@ -4,8 +4,8 @@ requests
 numpy
 openai
 langchain
-faiss-cp
-pdfplumbe
+faiss-cpu
+pdfplumber
 python-docx
 chardet
 # Optional dependencies:
