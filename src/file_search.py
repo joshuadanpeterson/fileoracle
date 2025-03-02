@@ -9,7 +9,7 @@ to a few seconds to prevent long searches.
 
 import subprocess
 import os
-import openai  # Ensure OPENAI_API_KEY is set in your environment
+from openai import OpenAI  # Ensure OPENAI_API_KEY is set in your environment
 
 # Define the default directories to search.
 DEFAULT_DIRECTORIES = [
@@ -33,13 +33,16 @@ def generate_keywords(query, num_keywords=3):
     )
 
     try:
-        response = openai.ChatCompletion.create(
-            model="o3-mini-high",
+        # Initialize the OpenAI client
+        client = OpenAI()
+        
+        # Call the OpenAI API with the new format
+        response = client.chat.completions.create(
+            model="o3-mini",
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.0,
         )
         # Extract the content and split by commas.
-        content = response["choices"][0]["message"]["content"]
+        content = response.choices[0].message.content
         keywords = [kw.strip() for kw in content.split(",") if kw.strip()]
         return keywords if keywords else [query]
     except Exception as e:
