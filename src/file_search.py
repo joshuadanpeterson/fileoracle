@@ -84,17 +84,60 @@ def name_based_search(keyword, directory, timeout=30):
     return []
 
 
-def content_based_search(keyword, directory, timeout=30):
+def content_based_search(keyword, directory, timeout=30, max_depth=5, max_filesize="5M", threads=4):
     """
     Search file contents in the given directory for matches to 'keyword'.
-    This uses ripgrep's --files-with-matches mode.
+    This uses ripgrep's --files-with-matches mode with optimizations:
+    - Limits to text files only
+    - Sets maximum directory depth
+    - Sets maximum file size
+    - Excludes common large directories
+    - Controls CPU usage with threads parameter
 
     :param keyword: The keyword to match in file contents.
     :param directory: Directory path to search in.
     :param timeout: Timeout in seconds for the ripgrep command (default 30s).
+    :param max_depth: Maximum directory depth to search (default 5).
+    :param max_filesize: Maximum file size to search (default "5M").
+    :param threads: Number of threads to use for searching (default 4).
     :return: A list of file paths whose contents match the keyword.
     """
-    command = ["rg", "--files-with-matches", "--ignore-case", keyword, directory]
+    # Common directories and files to exclude
+    exclude_patterns = [
+        "--glob", "!**/.git/**",
+        "--glob", "!**/node_modules/**",
+        "--glob", "!**/.venv/**",
+        "--glob", "!**/venv/**",
+        "--glob", "!**/__pycache__/**",
+        "--glob", "!**/build/**",
+        "--glob", "!**/dist/**",
+        "--glob", "!**/*.jpg",
+        "--glob", "!**/*.jpeg",
+        "--glob", "!**/*.png",
+        "--glob", "!**/*.gif",
+        "--glob", "!**/*.mp4",
+        "--glob", "!**/*.mp3",
+        "--glob", "!**/*.zip",
+        "--glob", "!**/*.tar",
+        "--glob", "!**/*.gz",
+    ]
+    
+    command = [
+        "rg",
+        "--files-with-matches",
+        "--ignore-case",
+        "--type", "text",          # Only search text files
+        "--max-depth", str(max_depth),  # Limit directory depth
+        "--max-filesize", max_filesize, # Limit file size
+        "--threads", str(threads),      # Control CPU usage
+    ]
+    
+    # Add all exclude patterns
+    command.extend(exclude_patterns)
+    
+    # Add the search keyword and directory
+    command.extend([keyword, directory])
+    
     try:
         result = subprocess.run(
             command, capture_output=True, text=True, timeout=timeout
@@ -108,7 +151,7 @@ def content_based_search(keyword, directory, timeout=30):
     return []
 
 
-def search_files(query, directories=DEFAULT_DIRECTORIES, timeout=30, name_threshold=5):
+def search_files(query, directories=DEFAULT_DIRECTORIES, timeout=30, name_threshold=5, max_depth=5, max_filesize="5M", threads=4):
     """
     Perform a combined search: run a name-based search and, if the results are insufficient,
     supplement with a content-based search.
@@ -135,7 +178,14 @@ def search_files(query, directories=DEFAULT_DIRECTORIES, timeout=30, name_thresh
             
             # Only perform content-based search if name-based results are low.
             if len(name_results) < name_threshold:
-                content_results = content_based_search(keyword, directory, timeout=timeout)
+                content_results = content_based_search(
+                    keyword, 
+                    directory, 
+                    timeout=timeout,
+                    max_depth=max_depth,
+                    max_filesize=max_filesize,
+                    threads=threads
+                )
                 results.update(content_results)
                 
     return list(results)
