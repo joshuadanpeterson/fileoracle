@@ -108,30 +108,34 @@ def content_based_search(keyword, directory, timeout=30):
     return []
 
 
-def search_files(query, directories=DEFAULT_DIRECTORIES, timeout=30):
+def search_files(query, directories=DEFAULT_DIRECTORIES, timeout=30, name_threshold=5):
     """
-    Perform a combined name-based and content-based search for files matching the query
-    across multiple directories. Uses LLM-generated keywords (with underscore and dash variants).
-
+    Perform a combined search: run a name-based search and, if the results are insufficient,
+    supplement with a content-based search.
+    
     :param query: The search query.
     :param directories: A list of directories to search.
-    :param timeout: Timeout (in seconds) for each ripgrep query (default 30s).
-    :return: List of file paths matching any of the generated keywords (by name or content).
+    :param timeout: Timeout (in seconds) for each ripgrep query.
+    :param name_threshold: Minimum number of results from name-based search before skipping content search.
+    :return: List of file paths matching any of the generated keywords.
     """
     results = set()
-
+    
     # Generate effective keywords using the LLM.
     keywords = generate_keywords(query)
     print(f"Generated keywords: {keywords}")
-
-    # Iterate through each directory and keyword.
+    
     for directory in directories:
         directory = os.path.expanduser(directory)
         for keyword in keywords:
-            # Combine name-based and content-based search results.
+            # First, perform a name-based search.
             name_results = name_based_search(keyword, directory, timeout=timeout)
-            content_results = content_based_search(keyword, directory, timeout=timeout)
-            combined = name_results + content_results
-            for f in combined:
-                results.add(f)
+            # Add name-based results.
+            results.update(name_results)
+            
+            # Only perform content-based search if name-based results are low.
+            if len(name_results) < name_threshold:
+                content_results = content_based_search(keyword, directory, timeout=timeout)
+                results.update(content_results)
+                
     return list(results)
