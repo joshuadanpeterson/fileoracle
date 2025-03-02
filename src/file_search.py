@@ -1,10 +1,13 @@
 """
 file_search.py
 
-This module provides functionality to search for keywords in text-based files
-across multiple directories using ripgrep. It leverages an LLM to generate
-effective search keywords from the user's query, expands them with underscore
-and dash variants, and limits each ripgrep call to a few seconds to prevent long searches.
+This module provides functionality to search for files using a combined approach:
+1) Name-based search using ripgrep's --files and glob patterns for each keyword.
+2) Content-based search using ripgrep's --files-with-matches.
+
+It leverages an LLM to generate effective search keywords from the user's query,
+including underscore and dash variants, and uses a longer timeout to allow ripgrep
+to fully search large directories.
 """
 
 import subprocess
@@ -38,10 +41,11 @@ def generate_keywords(query, num_keywords=3):
 
     try:
         completion = client.chat.completions.create(
-            model="gpt-4o", store=True, messages=[{"role": "user", "content": prompt}]
+            model="o3-mini", store=True, messages=[{"role": "user", "content": prompt}]
         )
         content = completion.choices[0].message.content
         base_keywords = [kw.strip() for kw in content.split(",") if kw.strip()]
+
         # Expand keywords to include underscore and dash variants.
         expanded_keywords = set()
         for kw in base_keywords:
@@ -56,17 +60,65 @@ def generate_keywords(query, num_keywords=3):
         return [query]
 
 
-def search_files(query, directories=DEFAULT_DIRECTORIES, timeout=3):
+def name_based_search(keyword, directory, timeout=30):
     """
-    Search for files matching the query across multiple directories.
-    Uses LLM-generated keywords (with underscore and dash variants) to run multiple ripgrep searches with a timeout.
+    Search file names (not contents) in the given directory for matches to 'keyword'.
+    This uses ripgrep's --files mode plus a glob pattern.
+
+    :param keyword: The keyword to match in file names.
+    :param directory: Directory path to search in.
+    :param timeout: Timeout in seconds for the ripgrep command (default 30s).
+    :return: A list of file paths whose names match the keyword.
+    """
+    command = ["rg", "--files", "--ignore-case", f"-g*{keyword}*", directory]
+    try:
+        result = subprocess.run(
+            command, capture_output=True, text=True, timeout=timeout
+        )
+        files = result.stdout.strip().split("\n")
+        return [f for f in files if f]
+    except subprocess.TimeoutExpired:
+        print(f"Timeout expired for name-based search '{keyword}' in '{directory}'")
+    except Exception as e:
+        print(f"Error in name-based search for '{keyword}' in '{directory}': {e}")
+    return []
+
+
+def content_based_search(keyword, directory, timeout=30):
+    """
+    Search file contents in the given directory for matches to 'keyword'.
+    This uses ripgrep's --files-with-matches mode.
+
+    :param keyword: The keyword to match in file contents.
+    :param directory: Directory path to search in.
+    :param timeout: Timeout in seconds for the ripgrep command (default 30s).
+    :return: A list of file paths whose contents match the keyword.
+    """
+    command = ["rg", "--files-with-matches", "--ignore-case", keyword, directory]
+    try:
+        result = subprocess.run(
+            command, capture_output=True, text=True, timeout=timeout
+        )
+        files = result.stdout.strip().split("\n")
+        return [f for f in files if f]
+    except subprocess.TimeoutExpired:
+        print(f"Timeout expired for content-based search '{keyword}' in '{directory}'")
+    except Exception as e:
+        print(f"Error in content-based search for '{keyword}' in '{directory}': {e}")
+    return []
+
+
+def search_files(query, directories=DEFAULT_DIRECTORIES, timeout=30):
+    """
+    Perform a combined name-based and content-based search for files matching the query
+    across multiple directories. Uses LLM-generated keywords (with underscore and dash variants).
 
     :param query: The search query.
     :param directories: A list of directories to search.
-    :param timeout: Timeout (in seconds) for each ripgrep query.
-    :return: List of file paths matching any of the generated keywords.
+    :param timeout: Timeout (in seconds) for each ripgrep query (default 30s).
+    :return: List of file paths matching any of the generated keywords (by name or content).
     """
-    results = []
+    results = set()
 
     # Generate effective keywords using the LLM.
     keywords = generate_keywords(query)
@@ -76,58 +128,10 @@ def search_files(query, directories=DEFAULT_DIRECTORIES, timeout=3):
     for directory in directories:
         directory = os.path.expanduser(directory)
         for keyword in keywords:
-            command = [
-                "rg",
-                "--files-with-matches",
-                keyword,
-                directory,
-                "--ignore-case",
-            ]
-            try:
-                result = subprocess.run(
-                    command, capture_output=True, text=True, timeout=timeout
-                )
-                files = result.stdout.strip().split("\n")
-                results.extend([f for f in files if f])
-            except subprocess.TimeoutExpired:
-                print(
-                    f"Timeout expired for keyword '{keyword}' in directory '{directory}'"
-                )
-            except Exception as e:
-                print(
-                    f"Error running ripgrep for keyword '{keyword}' in '{directory}': {e}"
-                )
-    # Remove duplicates.
-    return list(set(results))
-
-
-def refine_fzf_selection(selected_files, query):
-    """
-    Given a list of candidate file paths selected via fzf and the original query,
-    use the LLM to determine which file is most likely to contain the relevant information.
-
-    :param selected_files: List of file paths returned by fzf.
-    :param query: The original search query.
-    :return: The file path that is deemed most relevant.
-    """
-    from openai import OpenAI
-
-    client = OpenAI()
-
-    # Construct a prompt to re-rank the candidate files.
-    prompt = (
-        f"I have the following candidate files from a search based on the query '{query}':\n"
-        f"{chr(10).join(selected_files)}\n\n"
-        "Based on their file names and implied context, which file is most likely to contain the information needed for the query? "
-        "Please respond with only the file path that is the best candidate."
-    )
-
-    try:
-        completion = client.chat.completions.create(
-            model="gpt-4o", store=True, messages=[{"role": "user", "content": prompt}]
-        )
-        best_file = completion.choices[0].message.content.strip()
-        return best_file
-    except Exception as e:
-        print(f"Error refining fzf selection: {e}")
-        return selected_files[0] if selected_files else None
+            # Combine name-based and content-based search results.
+            name_results = name_based_search(keyword, directory, timeout=timeout)
+            content_results = content_based_search(keyword, directory, timeout=timeout)
+            combined = name_results + content_results
+            for f in combined:
+                results.add(f)
+    return list(results)
