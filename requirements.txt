@@ -4,6 +4,7 @@ requests
 numpy
 openai
 langchain
+langchain_community
 faiss-cpu
 pdfplumber
 python-docx
