@@ -8,6 +8,7 @@ faiss-cpu
 pdfplumber
 python-docx
 chardet
+python-dotenv
 # Optional dependencies:
 unstructured
 tiktoken
