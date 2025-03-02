@@ -1,17 +1,25 @@
-# Default dependencies
+# Core dependencies
 flask
 requests
-numpy
-openai
+python-dotenv
+chardet
+
+# LangChain ecosystem
 langchain
 langchain_community
-faiss-cpu
+langchain-openai
+langchain-unstructured
+
+# Document processing
 pdfplumber
 python-docx
-chardet
-python-dotenv
-# Optional dependencies:
 unstructured
-tiktoken
-pandas
 
+# AI/ML dependencies
+openai
+faiss-cpu
+tiktoken
+
+# Data processing
+numpy
+pandas
