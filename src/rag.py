@@ -1,0 +1,38 @@
+"""
+rag.py
+
+This module implements the Retrieval Augmented Generation (RAG) pipeline.
+It retrieves relevant document chunks from the vector store and queries the LLM
+to generate an answer with citations.
+"""
+
+import openai
+from langchain.llms import OpenAI
+from langchain.chains.question_answering import load_qa_chain
+
+
+def run_qa_chain(vectorstore, question, k=5):
+    """
+    Run a Retrieval Augmented Generation (RAG) pipeline on the provided vector store.
+
+    :param vectorstore: A FAISS vector store with embedded documents.
+    :param question: The query to answer.
+    :param k: Number of documents to retrieve.
+    :return: Answer string with citations.
+    """
+    # Retrieve top k relevant documents.
+    retrieved_docs = vectorstore.similarity_search(question, k=k)
+
+    # Configure the LLM.
+    llm = OpenAI(openai_api_key="YOUR_API_KEY", model_name="o3-mini-high")
+
+    # Create a QA chain using the map_reduce strategy.
+    qa_chain = load_qa_chain(llm, chain_type="map_reduce")
+    answer = qa_chain.run(input_documents=retrieved_docs, question=question)
+
+    # Extract citation information from document metadata.
+    citations = "\n".join(
+        [f"- {doc.metadata.get('source', 'Unknown')}" for doc in retrieved_docs]
+    )
+    final_answer = f"{answer}\n\nCitations:\n{citations}"
+    return final_answer
