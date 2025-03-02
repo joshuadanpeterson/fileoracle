@@ -8,7 +8,7 @@ loading documents into the vector store, and running the RAG pipeline.
 
 import sys
 import os
-from src.file_search import search_files, refine_fzf_selection  # Updated import
+from src.file_search import search_files  # Only import what's needed
 from src.file_extractor import extract_text
 from src.rag import run_qa_chain
 from src.vector_store import load_documents, build_vector_store
