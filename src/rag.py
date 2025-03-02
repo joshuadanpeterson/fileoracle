@@ -6,8 +6,8 @@ It retrieves relevant document chunks from the vector store and queries the LLM
 to generate an answer with citations.
 """
 
-import openai
-from langchain_community.llms import OpenAI
+import os
+from langchain_community.chat_models import ChatOpenAI
 from langchain.chains.question_answering import load_qa_chain
 
 
@@ -27,7 +27,11 @@ def run_qa_chain(vectorstore, question, k=5):
     openai_api_key = os.getenv("OPENAI_API_KEY")
 
     # Configure the LLM with the API key.
-    llm = OpenAI(openai_api_key=openai_api_key, model_name="o3-mini-high")
+    llm = ChatOpenAI(
+        api_key=openai_api_key,
+        model_name="o3-mini-high",
+        temperature=0
+    )
 
     # Create a QA chain using the map_reduce strategy.
     qa_chain = load_qa_chain(llm, chain_type="map_reduce")

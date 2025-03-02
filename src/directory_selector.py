@@ -7,7 +7,7 @@ are most likely to contain relevant documents.
 """
 
 import os
-import openai
+from openai import OpenAI
 
 # Default directories to consider.
 DEFAULT_DIRECTORIES = [
@@ -54,13 +54,17 @@ def select_relevant_directories(query, directories=DEFAULT_DIRECTORIES):
     )
 
     # Call the LLM. Ensure OPENAI_API_KEY is set and openai is configured.
-    response = openai.ChatCompletion.create(
+    # Initialize the OpenAI client
+    client = OpenAI()
+    
+    # Call the OpenAI API with the new format
+    response = client.chat.completions.create(
         model="o3-mini-high",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.0,
     )
     # Split the response into lines.
-    selected = response["choices"][0]["message"]["content"].splitlines()
+    selected = response.choices[0].message.content.splitlines()
     # Validate that the directories are from our list.
     recommended = [d.strip() for d in selected if d.strip() in directories]
     # If none are recommended, fall back to all directories.
