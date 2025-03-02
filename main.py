@@ -1,9 +1,14 @@
 """
 main.py
 
-The entry point for FileOracle. This script prompts the user for a query
-and uses the Alfred integration module to process and display the answer.
+The entry point for FileOracle. This script loads environment variables,
+prompts the user for a query, and uses the Alfred integration module
+to process and display the answer.
 """
+
+from dotenv import load_dotenv
+
+load_dotenv()  # Load variables from .env
 
 
 def main():

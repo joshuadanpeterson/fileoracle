@@ -23,8 +23,11 @@ def run_qa_chain(vectorstore, question, k=5):
     # Retrieve top k relevant documents.
     retrieved_docs = vectorstore.similarity_search(question, k=k)
 
-    # Configure the LLM.
-    llm = OpenAI(openai_api_key="YOUR_API_KEY", model_name="o3-mini-high")
+    # Load the OpenAI API key from the environment variable.
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+
+    # Configure the LLM with the API key.
+    llm = OpenAI(openai_api_key=openai_api_key, model_name="o3-mini-high")
 
     # Create a QA chain using the map_reduce strategy.
     qa_chain = load_qa_chain(llm, chain_type="map_reduce")
