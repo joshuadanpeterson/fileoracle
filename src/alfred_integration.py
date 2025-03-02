@@ -12,16 +12,20 @@ from src.file_search import search_files
 from src.file_extractor import extract_text
 from src.rag import run_qa_chain
 from src.vector_store import load_documents, build_vector_store
-from src.directory_selector import iterative_directory_traversal as select_relevant_directories  # New import
+from src.directory_selector import iterative_directory_traversal as select_relevant_directory  # Using iterative traversal
 
-# Default directories are now defined in directory_selector.py
-
+# List of root directories in prioritized order: Dropbox, Google Drive, and ~/Documents.
+ROOT_DIRS = [
+    "/Users/joshpeterson/Library/CloudStorage/Dropbox/",
+    "/Users/joshpeterson/Library/CloudStorage/GoogleDrive-joshuadanpeterson@gmail.com/My Drive/",
+    os.path.expanduser('~/Documents')
+]
 
 def alfred_main(query):
     """
     Integrates with Alfred/Raycast to run a query.
 
-    1. Uses the LLM to filter directories based on the query.
+    1. For each root directory, uses the LLM to iteratively traverse and select the most relevant subdirectory.
     2. Searches for files matching the query in the selected directories.
     3. Extracts text from the first matching file.
     4. Loads documents from all selected directories.
@@ -29,9 +33,13 @@ def alfred_main(query):
 
     :param query: The query string from Alfred.
     """
-    # Use the LLM to determine which directories are relevant.
-    relevant_directories = select_relevant_directories(query)
-
+    # For each root directory, use iterative traversal to select the most relevant subdirectory.
+    relevant_directories = []
+    for root in ROOT_DIRS:
+        selected_directory = select_relevant_directory(root, query)
+        relevant_directories.append(selected_directory)
+    
+    # Now, relevant_directories is a list of directories from Dropbox, Google Drive, and Documents, in that order.
     matching_files = []
     # Search each recommended directory.
     for directory in relevant_directories:
@@ -56,7 +64,6 @@ def alfred_main(query):
     # Use the query as the question for the RAG pipeline.
     answer = run_qa_chain(vectorstore, query)
     print(answer)
-
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
