@@ -60,8 +60,7 @@ def select_relevant_directories(query, directories=DEFAULT_DIRECTORIES):
     # Call the OpenAI API with the new format
     response = client.chat.completions.create(
         model="o3-mini",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.0,
+        messages=[{"role": "user", "content": prompt}]
     )
     # Split the response into lines.
     selected = response.choices[0].message.content.splitlines()
