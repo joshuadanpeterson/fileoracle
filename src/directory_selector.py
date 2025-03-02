@@ -1,70 +1,84 @@
 """
 directory_selector.py
 
-This module uses an LLM to filter default directories based on a query.
-It summarizes each directory's contents and asks the LLM which directories 
-are most likely to contain relevant documents.
+This module implements an iterative directory traversal function.
+At each level, it uses an LLM to decide which subdirectory is most likely
+to contain files relevant to a given query, thereby winnowing down the search path.
 """
 
 import os
 from openai import OpenAI
 
-# Default directories to consider.
-DEFAULT_DIRECTORIES = [
-    "/Users/joshpeterson/Library/CloudStorage/Dropbox/",
-    "/Users/joshpeterson/Library/CloudStorage/GoogleDrive-joshuadanpeterson@gmail.com/My Drive/",
-    os.path.expanduser("~/Documents"),
-]
+client = OpenAI()
 
 
-def get_directory_summary(directories):
+def select_best_subdirectory(current_dir, query):
     """
-    Creates a summary for each directory by listing a few sample filenames.
+    Use the LLM to select the best subdirectory within current_dir based on the query.
 
-    :param directories: List of directory paths.
-    :return: Dictionary mapping directory paths to a list of sample filenames.
+    :param current_dir: The current directory to evaluate.
+    :param query: The user's search query.
+    :return: The selected subdirectory name or None if none is suitable.
     """
-    summary = {}
-    for directory in directories:
-        try:
-            # List up to 5 items for brevity.
-            files = os.listdir(directory)[:5]
-            summary[directory] = files
-        except Exception as e:
-            summary[directory] = [f"Error: {e}"]
-    return summary
+    try:
+        subdirs = [
+            d
+            for d in os.listdir(current_dir)
+            if os.path.isdir(os.path.join(current_dir, d))
+        ]
+    except Exception as e:
+        print(f"Error listing subdirectories in {current_dir}: {e}")
+        return None
 
+    if not subdirs:
+        return None
 
-def select_relevant_directories(query, directories=DEFAULT_DIRECTORIES):
-    """
-    Uses an LLM to select which directories are most likely to contain relevant documents.
-
-    :param query: The user's query.
-    :param directories: List of directory paths to consider.
-    :return: List of directories recommended for searching.
-    """
-    # Generate a summary of the directories.
-    summary = get_directory_summary(directories)
-    # Create a prompt that explains the context.
+    # Construct a prompt listing the subdirectories.
     prompt = (
-        "I have the following directories with sample file names:\n"
-        f"{summary}\n\n"
-        f"Based on the query '{query}', which directories are most likely to contain relevant documents? "
-        "List one directory per line, exactly as shown in the keys above."
+        f"Given the query: '{query}', which of the following subdirectories under '{current_dir}' is most likely "
+        "to contain relevant files? Respond with the exact subdirectory name. If none seem relevant, respond with 'none'.\n"
+        f"Subdirectories: {', '.join(subdirs)}"
     )
 
-    # Call the LLM. Ensure OPENAI_API_KEY is set and openai is configured.
-    # Initialize the OpenAI client
-    client = OpenAI()
-    
-    # Call the OpenAI API with the new format
-    response = client.chat.completions.create(
-        model="o3-mini",
-        messages=[{"role": "user", "content": prompt}]
-    )
-    # Split the response into lines.
-    selected = response.choices[0].message.content.splitlines()
-    # Validate that the directories are from our list.
-    recommended = [d.strip() for d in selected if d.strip() in directories]
-    # If none are recommended, fall back to all directories.
-    return recommended if recommended else directories
+    try:
+        completion = client.chat.completions.create(
+            model="gpt-4o", store=True, messages=[{"role": "user", "content": prompt}]
+        )
+        answer = completion.choices[0].message.content.strip().lower()
+        if answer == "none" or answer not in [d.lower() for d in subdirs]:
+            return None
+        # Return the matching subdirectory (case sensitive) from the list.
+        for d in subdirs:
+            if d.lower() == answer:
+                return d
+    except Exception as e:
+        print(f"Error during LLM subdirectory selection: {e}")
+        return None
+
+
+def iterative_directory_traversal(root_dir, query):
+    """
+    Iteratively traverse directories starting from root_dir by using the LLM to narrow
+    down the most likely path that contains relevant files for the given query.
+
+    :param root_dir: The starting directory.
+    :param query: The search query.
+    :return: The final directory path that is most likely to contain the relevant files.
+    """
+    current_dir = root_dir
+    while True:
+        best_subdir = select_best_subdirectory(current_dir, query)
+        if best_subdir is None:
+            break
+        new_dir = os.path.join(current_dir, best_subdir)
+        print(f"Descending into: {new_dir}")
+        current_dir = new_dir
+    return current_dir
+
+
+# Example usage:
+if __name__ == "__main__":
+    root = "/Users/joshpeterson/Library/CloudStorage/Dropbox/"
+    query = "budget projections"
+    final_path = iterative_directory_traversal(root, query)
+    print(f"Final selected directory: {final_path}")
