@@ -6,9 +6,9 @@ building a FAISS vector store for fast similarity search using LangChain.
 """
 
 import os
-from langchain_community.document_loaders import UnstructuredFileLoader
+from langchain_unstructured import UnstructuredLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import OpenAIEmbeddings
+from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 
 
@@ -25,7 +25,7 @@ def load_documents(directory):
     for filename in os.listdir(directory):
         filepath = os.path.join(directory, filename)
         try:
-            loader = UnstructuredFileLoader(filepath)
+            loader = UnstructuredLoader(filepath)
             # The loader returns a list of Document objects; add metadata if needed.
             for doc in loader.load():
                 doc.metadata["source"] = filepath
