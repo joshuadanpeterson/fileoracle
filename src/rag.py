@@ -29,7 +29,7 @@ def run_qa_chain(vectorstore, question, k=5):
     # Configure the LLM with the API key.
     llm = ChatOpenAI(
         api_key=openai_api_key,
-        model_name="o3-mini-high",
+        model_name="o3-mini",
         temperature=0
     )
 

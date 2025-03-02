@@ -59,7 +59,7 @@ def select_relevant_directories(query, directories=DEFAULT_DIRECTORIES):
     
     # Call the OpenAI API with the new format
     response = client.chat.completions.create(
-        model="o3-mini-high",
+        model="o3-mini",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.0,
     )
