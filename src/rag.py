@@ -7,8 +7,10 @@ to generate an answer with citations.
 """
 
 import os
-from langchain_community.chat_models import ChatOpenAI
-from langchain.chains.question_answering import load_qa_chain
+from langchain_openai import ChatOpenAI
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain.chains.retrieval import create_retrieval_chain
+from langchain.prompts import PromptTemplate
 
 
 def run_qa_chain(vectorstore, question, k=5):
@@ -29,12 +31,31 @@ def run_qa_chain(vectorstore, question, k=5):
     # Configure the LLM with the API key.
     llm = ChatOpenAI(
         api_key=openai_api_key,
-        model_name="o3-mini"
+        model_name="o3-mini",
+        temperature=None  # Explicitly set temperature to None for o3-mini model
     )
 
-    # Create a QA chain using the map_reduce strategy.
-    qa_chain = load_qa_chain(llm, chain_type="map_reduce")
-    answer = qa_chain.run(input_documents=retrieved_docs, question=question)
+    # Create a document processing chain using the modern approach
+    prompt_template = """
+    Use the following pieces of context to answer the question at the end.
+    If you don't know the answer, just say that you don't know, don't try to make up an answer.
+    
+    {context}
+    
+    Question: {question}
+    """
+    prompt = PromptTemplate.from_template(prompt_template)
+    
+    # Create document chain
+    document_chain = create_stuff_documents_chain(llm, prompt)
+    
+    # Create retrieval chain from the vectorstore retriever and document chain
+    retriever = vectorstore.as_retriever()
+    qa_chain = create_retrieval_chain(retriever, document_chain)
+    
+    # Execute the chain using invoke() instead of the deprecated run()
+    response = qa_chain.invoke({"question": question})
+    answer = response["answer"]
 
     # Extract citation information from document metadata.
     citations = "\n".join(
