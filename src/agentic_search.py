@@ -150,7 +150,7 @@ def search_agent(query, timeout=30, name_threshold=3):
     best_file = refine_fzf_selection(all_results, query) if all_results else None
     return best_file, all_results
 
-def answer_query_from_files(query, file_paths):
+ef answer_query_from_files(query, file_paths):
     """
     Given a list of file paths, read their contents, build a vector store, and
     use a RAG pipeline to answer the query.
@@ -162,7 +162,6 @@ def answer_query_from_files(query, file_paths):
     documents = []
     print("\n--- Document Extraction ---")
     for fp in file_paths:
-        print(f"Extracting text from: {fp}")
         try:
             text = extract_text(fp)
         except Exception as e:
@@ -176,7 +175,7 @@ def answer_query_from_files(query, file_paths):
             print(f"Skipped {fp}: Insufficient content extracted (length={extracted_length}).")
     
     if not documents:
-        print("Warning: No documents with sufficient content were extracted.")
+        print("No documents with sufficient content were extracted from the candidate files.")
         return "No readable content found in the candidate files."
     
     print(f"\nBuilding vector store from {len(documents)} documents...")
@@ -196,6 +195,7 @@ def answer_query_from_files(query, file_paths):
     if not answer or answer.strip() == "":
         answer = "The documents did not provide enough context to generate an answer."
     
+    print("RAG pipeline output received.")
     return answer
 
 if __name__ == "__main__":
