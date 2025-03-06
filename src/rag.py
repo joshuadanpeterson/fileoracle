@@ -54,7 +54,7 @@ def run_qa_chain(vectorstore, question, k=5):
     qa_chain = create_retrieval_chain(retriever, document_chain)
     
     # Execute the chain using invoke() instead of the deprecated run()
-    response = qa_chain.invoke({"question": question})
+    response = qa_chain.invoke({"input": question, "question": question})
     answer = response["answer"]
 
     # Extract citation information from document metadata.
