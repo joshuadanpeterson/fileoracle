@@ -7,10 +7,10 @@ It now filters out hidden files, directories, and files that do not have an allo
 """
 
 import os
-from langchain.document_loaders import UnstructuredFileLoader
+from langchain_unstructured import UnstructuredLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import FAISS
+from langchain_openai import OpenAIEmbeddings
+from langchain_community.vectorstores import FAISS
 
 # Restrict processing to only these file types.
 ALLOWED_EXTENSIONS = {'.pdf', '.doc', '.docx', '.txt', '.md'}
@@ -24,7 +24,7 @@ def is_relevant_file(filepath):
 
 def load_documents(directory):
     """
-    Load documents from a directory using LangChain's UnstructuredFileLoader.
+    Load documents from a directory using LangChain's UnstructuredLoader.
     Filters out hidden files, directories, and files that do not have an allowed extension.
     
     Each document is augmented with metadata containing its source path.
@@ -52,7 +52,7 @@ def load_documents(directory):
                 continue
 
             try:
-                loader = UnstructuredFileLoader(filepath)
+                loader = UnstructuredLoader(filepath)
                 for doc in loader.load():
                     doc.metadata["source"] = filepath
                     docs.append(doc)
