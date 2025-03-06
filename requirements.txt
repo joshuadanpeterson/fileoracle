@@ -23,3 +23,7 @@ tiktoken
 # Data processing
 numpy
 pandas
+
+# Unstructured data processing
+unstructured[pdf]
+unstructured[None]
