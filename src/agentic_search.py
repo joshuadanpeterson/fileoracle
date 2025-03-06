@@ -20,6 +20,7 @@ from src.file_search import (
     generate_keywords,
     refine_fzf_selection
 )
+from langchain.docstore.document import Document
 from src.directory_selector import iterative_directory_traversal
 from src.file_extractor import extract_text
 from src.vector_store import build_vector_store
