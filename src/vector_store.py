@@ -3,18 +3,20 @@ vector_store.py
 
 This module handles document loading, text splitting, embedding, and
 building a FAISS vector store for fast similarity search using LangChain.
+It now filters out irrelevant files and directories to avoid errors during loading.
 """
 
 import os
-from langchain_unstructured import UnstructuredLoader
+from langchain.document_loaders import UnstructuredFileLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_openai import OpenAIEmbeddings
-from langchain_community.vectorstores import FAISS
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.vectorstores import FAISS
 
 
 def load_documents(directory):
     """
     Load documents from a directory using LangChain's UnstructuredFileLoader.
+    Filters out hidden files, directories, and other known irrelevant names to avoid errors.
 
     Each document is augmented with metadata containing its source path.
 
@@ -22,16 +24,29 @@ def load_documents(directory):
     :return: List of documents.
     """
     docs = []
-    for filename in os.listdir(directory):
-        filepath = os.path.join(directory, filename)
-        try:
-            loader = UnstructuredLoader(filepath)
-            # The loader returns a list of Document objects; add metadata if needed.
-            for doc in loader.load():
-                doc.metadata["source"] = filepath
-                docs.append(doc)
-        except Exception as e:
-            print(f"Error loading {filepath}: {e}")
+    # Define an exclusion set for filenames known to be irrelevant.
+    exclusion_set = {".DS_Store", ".dropbox", "Trash", "Recovered Data"}
+
+    try:
+        for filename in os.listdir(directory):
+            # Skip hidden files or files in the exclusion set.
+            if filename.startswith(".") or filename in exclusion_set:
+                continue
+
+            filepath = os.path.join(directory, filename)
+            # Only process if it's a regular file.
+            if not os.path.isfile(filepath):
+                continue
+
+            try:
+                loader = UnstructuredFileLoader(filepath)
+                for doc in loader.load():
+                    doc.metadata["source"] = filepath
+                    docs.append(doc)
+            except Exception as e:
+                print(f"Error loading {filepath}: {e}")
+    except Exception as dir_error:
+        print(f"Error accessing directory {directory}: {dir_error}")
     return docs
 
 
