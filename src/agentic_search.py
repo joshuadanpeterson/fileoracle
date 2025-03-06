@@ -150,7 +150,7 @@ def search_agent(query, timeout=30, name_threshold=3):
     best_file = refine_fzf_selection(all_results, query) if all_results else None
     return best_file, all_results
 
-ef answer_query_from_files(query, file_paths):
+def answer_query_from_files(query, file_paths):
     """
     Given a list of file paths, read their contents, build a vector store, and
     use a RAG pipeline to answer the query.
