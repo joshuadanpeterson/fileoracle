@@ -162,6 +162,7 @@ def answer_query_from_files(query, file_paths):
     documents = []
     print("\n--- Document Extraction ---")
     for fp in file_paths:
+        print(f"Processing file: {fp}")
         try:
             text = extract_text(fp)
         except Exception as e:
@@ -169,25 +170,34 @@ def answer_query_from_files(query, file_paths):
             text = ""
         if text and len(text) > 50:
             documents.append(Document(page_content=text, metadata={"source": fp}))
-            print(f"Extracted {len(text)} characters from {fp}")
+            print(f"Extracted {len(text)} characters. Preview: {text[:200]}...")
         else:
             extracted_length = len(text) if text else 0
             print(f"Skipped {fp}: Insufficient content extracted (length={extracted_length}).")
     
     if not documents:
-        print("No documents with sufficient content were extracted from the candidate files.")
+        print("No documents with sufficient content were extracted.")
         return "No readable content found in the candidate files."
     
-    print(f"\nBuilding vector store from {len(documents)} documents...")
+    print(f"\nTotal documents extracted: {len(documents)}")
+    
+    print("\n--- Building Vector Store ---")
     try:
         vectorstore = build_vector_store(documents)
+        # Debug: print number of chunks in the vector store.
+        if hasattr(vectorstore, "docstore"):
+            num_chunks = len(vectorstore.docstore.search("dummy query", k=1000))
+            print(f"Vector store built with approximately {num_chunks} chunks (approximation).")
+        else:
+            print("Vector store built.")
     except Exception as e:
         print(f"Error building vector store: {e}")
         return "Error building vector store from documents."
     
-    print("Running RAG pipeline to answer the query...")
+    print("\n--- Running RAG Pipeline ---")
     try:
         answer = run_qa_chain(vectorstore, query)
+        print("RAG pipeline produced an answer.")
     except Exception as e:
         print(f"Error running RAG pipeline: {e}")
         answer = "Error generating answer from the documents."
@@ -195,7 +205,6 @@ def answer_query_from_files(query, file_paths):
     if not answer or answer.strip() == "":
         answer = "The documents did not provide enough context to generate an answer."
     
-    print("RAG pipeline output received.")
     return answer
 
 if __name__ == "__main__":
