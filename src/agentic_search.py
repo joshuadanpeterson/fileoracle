@@ -163,21 +163,39 @@ def answer_query_from_files(query, file_paths):
     print("\n--- Document Extraction ---")
     for fp in file_paths:
         print(f"Extracting text from: {fp}")
-        text = extract_text(fp)
+        try:
+            text = extract_text(fp)
+        except Exception as e:
+            print(f"Error extracting text from {fp}: {e}")
+            text = ""
         if text and len(text) > 50:
             documents.append(Document(page_content=text, metadata={"source": fp}))
             print(f"Extracted {len(text)} characters from {fp}")
         else:
-            print(f"Skipped {fp}: Insufficient content extracted.")
+            extracted_length = len(text) if text else 0
+            print(f"Skipped {fp}: Insufficient content extracted (length={extracted_length}).")
     
     if not documents:
+        print("Warning: No documents with sufficient content were extracted.")
         return "No readable content found in the candidate files."
     
     print(f"\nBuilding vector store from {len(documents)} documents...")
-    vectorstore = build_vector_store(documents)
+    try:
+        vectorstore = build_vector_store(documents)
+    except Exception as e:
+        print(f"Error building vector store: {e}")
+        return "Error building vector store from documents."
     
     print("Running RAG pipeline to answer the query...")
-    answer = run_qa_chain(vectorstore, query)
+    try:
+        answer = run_qa_chain(vectorstore, query)
+    except Exception as e:
+        print(f"Error running RAG pipeline: {e}")
+        answer = "Error generating answer from the documents."
+    
+    if not answer or answer.strip() == "":
+        answer = "The documents did not provide enough context to generate an answer."
+    
     return answer
 
 if __name__ == "__main__":
