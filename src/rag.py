@@ -31,8 +31,8 @@ def run_qa_chain(vectorstore, question, k=5):
     # Configure the LLM with the API key.
     llm = ChatOpenAI(
         api_key=openai_api_key,
-        model_name="o3-mini",
-        temperature=None  # Explicitly set temperature to None for o3-mini model
+        model_name="gpt-4o-mini",
+        temperature=None  # Explicitly set temperature to None for gpt-4o-mini model
     )
 
     # Create a document processing chain using the modern approach
