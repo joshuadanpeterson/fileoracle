@@ -3,8 +3,7 @@ vector_store.py
 
 This module handles document loading, text splitting, embedding, and
 building a FAISS vector store for fast similarity search using LangChain.
-It now filters out hidden files, directories, and files with extensions
-not in the allowed set to avoid errors during loading.
+It now filters out hidden files, directories, and files that do not have an allowed extension.
 """
 
 import os
@@ -13,10 +12,15 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.vectorstores import FAISS
 
-# Define a set of allowed file extensions to process.
-ALLOWED_EXTENSIONS = {
-    '.pdf', '.doc', '.docx', '.txt', '.md', '.gdoc', '.gsheet', '.csv', '.json'
-}
+# Restrict processing to only these file types.
+ALLOWED_EXTENSIONS = {'.pdf', '.doc', '.docx', '.txt', '.md'}
+
+def is_relevant_file(filepath):
+    """
+    Return True if the file has an allowed extension.
+    """
+    ext = os.path.splitext(filepath)[1].lower()
+    return ext in ALLOWED_EXTENSIONS
 
 def load_documents(directory):
     """
@@ -34,18 +38,17 @@ def load_documents(directory):
 
     try:
         for filename in os.listdir(directory):
-            # Skip hidden files or those in the exclusion set.
+            # Skip hidden files and those in the exclusion set.
             if filename.startswith('.') or filename in exclusion_set:
                 continue
 
             filepath = os.path.join(directory, filename)
-            # Check if the file exists and is a regular file.
+            # Skip if the file doesn't exist or isn't a regular file.
             if not os.path.exists(filepath) or not os.path.isfile(filepath):
                 continue
 
-            # Check if the file extension is allowed.
-            ext = os.path.splitext(filename)[1].lower()
-            if ext not in ALLOWED_EXTENSIONS:
+            # Skip files that do not have an allowed extension.
+            if not is_relevant_file(filepath):
                 continue
 
             try:
