@@ -6,8 +6,10 @@ The search agent uses LLM-driven decision-making to autonomously select a search
 In this version, the agent prioritizes name-based search results:
 - For each candidate directory (narrowed down via iterative traversal), it first runs a name-based search.
 - If the number of name-based hits is below a specified threshold, it supplements with content-based search.
-- After combining results, an additional filtering step retains only files whose paths contain a minimum number of the generated keywords.
-- Finally, the documents corresponding to these candidate file paths are read, aggregated into a vector store, and queried via a RAG pipeline to answer the user’s query.
+- After combining results, an additional filtering step retains only files whose paths contain
+  a minimum number of the generated keywords.
+- Finally, the documents corresponding to these candidate file paths are read,
+  aggregated into a vector store, and a RAG pipeline is used to answer the user’s query.
 """
 
 import os
@@ -161,7 +163,7 @@ def answer_query_from_files(query, file_paths):
     for fp in file_paths:
         text = extract_text(fp)
         if text and len(text) > 50:  # Ensure there's meaningful content
-            # Create a simple document dict; in practice, these would be Document objects.
+            # Wrap the text and metadata into a Document-like dict.
             documents.append({"page_content": text, "metadata": {"source": fp}})
     
     if not documents:
@@ -170,7 +172,7 @@ def answer_query_from_files(query, file_paths):
     # Step 2: Build a vector store from the documents.
     vectorstore = build_vector_store(documents)
     
-    # Step 3: Run the RAG pipeline (QA chain) to answer the query.
+    # Step 3: Run the RAG pipeline to answer the query.
     answer = run_qa_chain(vectorstore, query)
     return answer
 
