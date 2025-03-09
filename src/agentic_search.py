@@ -184,10 +184,10 @@ def answer_query_from_files(query, file_paths):
     print("\n--- Building Vector Store ---")
     try:
         vectorstore = build_vector_store(documents)
-        # Debug: print number of chunks in the vector store.
-        if hasattr(vectorstore, "docstore"):
-            num_chunks = len(vectorstore.docstore.search("dummy query", k=1000))
-            print(f"Vector store built with approximately {num_chunks} chunks (approximation).")
+        # Debug: print information about the vector store.
+        if hasattr(vectorstore, "docstore") and hasattr(vectorstore.docstore, "_dict"):
+            num_chunks = len(vectorstore.docstore._dict)
+            print(f"Vector store built with {num_chunks} chunks.")
         else:
             print("Vector store built.")
     except Exception as e:
