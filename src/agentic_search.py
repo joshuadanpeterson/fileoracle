@@ -172,7 +172,7 @@ def search_agent(
 
 
 def answer_query_from_files(
-    query, file_paths, use_responses_api=False, vector_store_id=None
+    query, file_paths, use_responses_api=False, vector_store_id=None,
 ):
     """
     Given a list of file paths, read their contents, build a vector store, and
@@ -198,10 +198,8 @@ def answer_query_from_files(
                     "vector_store_ids": [vector_store_id],
                     "max_num_results": 10,
                 }
-            ],
-            include=["output[*].message"],
+            ]
         )
-        return response
     else:
         # Existing local implementation:
         from langchain.docstore.document import Document

@@ -31,7 +31,6 @@ def main():
         query,
         results,
         use_responses_api=True,
-        vector_store_id="vs_67d3c86e9e9481918e5d2077e8d8836b",
     )
     print("\nFinal Answer:")
     print(answer)
