@@ -7,6 +7,7 @@ and then reads those documents to answer the query using the RAG pipeline.
 """
 
 from dotenv import load_dotenv
+import os
 
 load_dotenv()  # Load environment variables from .env
 
@@ -25,12 +26,13 @@ def main():
     for r in results:
         print(r)
 
-    # Generate an answer from the candidate files.
+    # Retrieve the vector store ID from the environment
+    vector_store_id = os.getenv("VECTOR_STORE_ID")
+
+    # Generate an answer using the candidate files.
     print("\nAnswering query using the candidate files...")
     answer = answer_query_from_files(
-        query,
-        results,
-        use_responses_api=True,
+        query, results, use_responses_api=True, vector_store_id=vector_store_id
     )
     print("\nFinal Answer:")
     print(answer)
@@ -38,3 +40,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
