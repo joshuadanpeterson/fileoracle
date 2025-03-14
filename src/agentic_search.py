@@ -36,25 +36,89 @@ ROOT_DIRS = [
     os.path.expanduser("~/Documents"),
 ]
 
-def extract_override_directory(query):
+def detect_relevant_paths(query):
     """
-    Checks the query for an override instruction such as 
-    "restrict searches to Dropbox in the DropSyncFiles folder"
-    and returns the corresponding root directory path if found.
+    Uses the LLM to analyze the query for path references and map them to actual filesystem paths.
     
-    For example, if the query contains both "dropbox" and "dropsyncfiles",
-    returns "/Users/joshpeterson/Library/CloudStorage/Dropbox/DropsyncFiles".
+    The function detects mentions of common folders like 'Dropbox', 'Google Drive', 'Documents', 
+    'Downloads', etc., and maps them to their actual paths in the filesystem.
+    
+    It also handles explicit directory requests like "restrict searches to ..." or
+    "look in my Documents folder".
+    
+    :param query: The search query string
+    :return: List of relevant directories to search, or None if no specific paths detected
     """
+    # Define common folder mappings
+    FOLDER_MAPPINGS = {
+        "dropbox": "/Users/joshpeterson/Library/CloudStorage/Dropbox/",
+        "dropsyncfiles": "/Users/joshpeterson/Library/CloudStorage/Dropbox/DropsyncFiles",
+        "google drive": "/Users/joshpeterson/Library/CloudStorage/GoogleDrive-joshuadanpeterson@gmail.com/My Drive/",
+        "documents": os.path.expanduser("~/Documents"),
+        "downloads": os.path.expanduser("~/Downloads"),
+        "desktop": os.path.expanduser("~/Desktop"),
+        "pictures": os.path.expanduser("~/Pictures"),
+        "music": os.path.expanduser("~/Music"),
+        "videos": os.path.expanduser("~/Videos"),
+        "home": os.path.expanduser("~"),
+    }
+    
+    # First, check for explicit override instructions (keeping the old logic for backward compatibility)
     lower_query = query.lower()
     phrase = "restrict searches to"
     if phrase in lower_query:
-        # Extract the portion after the phrase.
         override_text = lower_query.split(phrase, 1)[1].strip()
-        # Simple heuristic: if override_text mentions both "dropbox" and "dropsyncfiles",
-        # return the Dropbox DropsyncFiles folder.
         if "dropbox" in override_text and "dropsyncfiles" in override_text:
-            return "/Users/joshpeterson/Library/CloudStorage/Dropbox/DropsyncFiles"
-    return None
+            return ["/Users/joshpeterson/Library/CloudStorage/Dropbox/DropsyncFiles"]
+    
+    # Use the LLM to identify potential directories mentioned in the query
+    prompt = f"""
+    Analyze the following search query and identify any folder or location references that could 
+    help narrow down where to search for files:
+    
+    Query: "{query}"
+    
+    If the query mentions or implies any specific locations like Dropbox, Google Drive, Documents, etc.,
+    list them one per line. If the query does not mention or strongly imply any specific location,
+    respond with "None".
+    
+    For example:
+    - "find my tax documents from 2022" might imply "Documents" or "Dropbox"
+    - "code for my Python project" might imply "Documents" or a programming folder
+    - "photos from my vacation" might imply "Pictures"
+    
+    Output only the folder names, one per line, or "None".
+    """
+    
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini", 
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+        )
+        
+        folder_suggestions = response.choices[0].message.content.strip().split('\n')
+        
+        # Process the suggestions
+        if len(folder_suggestions) == 1 and folder_suggestions[0].lower() == "none":
+            return None
+        
+        # Map the suggested folders to actual paths
+        relevant_paths = []
+        for suggestion in folder_suggestions:
+            suggestion = suggestion.lower().strip()
+            
+            # Check if the suggestion matches any of our mapped folders
+            for folder_name, folder_path in FOLDER_MAPPINGS.items():
+                if folder_name in suggestion:
+                    if os.path.exists(folder_path) and folder_path not in relevant_paths:
+                        relevant_paths.append(folder_path)
+        
+        return relevant_paths if relevant_paths else None
+        
+    except Exception as e:
+        print(f"Error in detect_relevant_paths: {e}")
+        return None
 
 def call_llm_for_decision(prompt):
     """
@@ -119,12 +183,16 @@ def search_agent(query, timeout=30, name_threshold=3, max_results=None, filter_k
     :param filter_keyword: Optional additional keyword to filter file paths.
     :return: Tuple of (best_file, all_results).
     """
-    # Check for an override directory in the query.
-    override_dir = extract_override_directory(query)
-    if override_dir:
-        print(f"Overriding candidate directories with: {override_dir}")
-        candidate_dirs = [iterative_directory_traversal(override_dir, query)]
+    # Detect relevant paths based on the query
+    relevant_paths = detect_relevant_paths(query)
+    if relevant_paths:
+        print(f"Detected relevant directories: {relevant_paths}")
+        candidate_dirs = []
+        for path in relevant_paths:
+            selected_dir = iterative_directory_traversal(path, query)
+            candidate_dirs.append(selected_dir)
     else:
+        print("No specific directories detected, using default ROOT_DIRS")
         candidate_dirs = []
         for root in ROOT_DIRS:
             selected_dir = iterative_directory_traversal(root, query)
@@ -191,16 +259,81 @@ def answer_query_from_files(query, file_paths, use_responses_api=False, vector_s
     """
     if use_responses_api and vector_store_id:
         print("Using OpenAI's Responses API for answer generation...")
-        response = client.responses.create(
-            model="gpt-4o-mini",
-            input=query,
-            tools=[{
-                "type": "file_search",
-                "vector_store_ids": [vector_store_id],
-                "max_num_results": 10
-            }]
-        )
-        return response
+        try:
+            print(f"Sending query to OpenAI Responses API with vector_store_id: {vector_store_id}")
+            response = client.responses.create(
+                model="gpt-4o-mini",
+                input=query,
+                context=[{
+                    "type": "file_search",
+                    "vector_store_id": vector_store_id
+                }],
+                temperature=0.0
+            )
+            
+            # Debug: Print response structure
+            print(f"Response received. Type: {type(response)}")
+            print(f"Response attributes: {dir(response)}")
+            
+            # Validate response structure
+            if not hasattr(response, 'choices') or not response.choices:
+                print(f"Error: Invalid response structure - missing choices: {response}")
+                return "Error: The API response did not contain expected 'choices' data."
+                
+            # Access first choice
+            choice = response.choices[0]
+            if not hasattr(choice, 'message'):
+                print(f"Error: First choice missing message attribute: {choice}")
+                return "Error: The API response contained malformed choice data."
+                
+            # Get message content
+            message = choice.message
+            if not hasattr(message, 'content') or not message.content:
+                print(f"Error: Message has no content. Message attributes: {dir(message)}")
+                return "No response content was generated by the API."
+                
+            answer_text = message.content
+            print(f"Answer text successfully extracted, length: {len(answer_text)}")
+            
+            # Format citations if available
+            citations = []
+            if hasattr(message, 'annotations') and message.annotations:
+                print(f"Found {len(message.annotations)} annotations")
+                for i, annotation in enumerate(message.annotations):
+                    print(f"Annotation {i+1} type: {type(annotation)}, attributes: {dir(annotation)}")
+                    
+                    # Try different ways to access file information
+                    file_path = None
+                    if hasattr(annotation, 'file_path') and annotation.file_path:
+                        file_path = annotation.file_path
+                    elif hasattr(annotation, 'file_citation') and annotation.file_citation:
+                        if hasattr(annotation.file_citation, 'file_path'):
+                            file_path = annotation.file_citation.file_path
+                    elif hasattr(annotation, 'text'):
+                        # Sometimes annotations include citation info in text
+                        file_path = f"Citation: {annotation.text}"
+                        
+                    if file_path:
+                        citation = f"[{i+1}] {file_path}"
+                        citations.append(citation)
+                        print(f"Added citation: {citation}")
+            else:
+                print("No annotations found in the response")
+            
+            # Combine answer with citations
+            if citations:
+                final_answer = f"{answer_text}\n\nSources:\n" + "\n".join(citations)
+            else:
+                final_answer = answer_text
+                
+            return final_answer
+            
+        except Exception as e:
+            import traceback
+            print(f"Error using OpenAI's Responses API: {e}")
+            print(f"Error details: {traceback.format_exc()}")
+            print("Falling back to traditional RAG pipeline...")
+            # Fall back to traditional RAG if the API call fails
     else:
         documents = []
         print("\n--- Document Extraction ---")
