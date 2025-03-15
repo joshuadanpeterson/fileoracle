@@ -261,15 +261,20 @@ def answer_query_from_files(query, file_paths, use_responses_api=False, vector_s
         print("Using OpenAI's Responses API for answer generation...")
         try:
             print(f"Sending query to OpenAI Responses API with vector_store_id: {vector_store_id}")
-            response = client.responses.create(
-                model="gpt-4o-mini",
-                input=query,
-                context=[{
+            # Create request object for visibility
+            request = {
+                "model": "gpt-4o-mini",
+                "input": query,
+                "tools": [{
                     "type": "file_search",
-                    "vector_store_id": vector_store_id
+                    "vector_store_ids": [vector_store_id]
                 }],
-                temperature=0.0
-            )
+                "temperature": 0.0
+            }
+            
+            print(f"Request structure: {request}")
+            
+            response = client.responses.create(**request)
             
             # Debug: Print response structure
             print(f"Response received. Type: {type(response)}")
